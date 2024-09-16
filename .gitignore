@@ -667,7 +667,14 @@ FodyWeavers.xsd
 notebooks/
 py_scripts/
 csv_prompt.py
-output/
+output/.~lock.my_imput.csv#
+output/input.csv
+output/my_imput.csv
+output/processed_prompts.csv
+output/responses.csv
+output/responses1.csv
+output/single_prompt_response.csv
 llm_prompt.py
 secrets.toml
 .streamlit/
+.devcontainer/
