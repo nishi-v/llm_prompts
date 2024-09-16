@@ -72,11 +72,16 @@ def get_next_prompt_id(csv_path: Path) -> str:
     return "prompt1"
 
 def save_single_prompt(prompt: str, responses: dict):
-    output_csv_path = dir / 'output/single_prompt_response.csv'
-    prompt_id = get_next_prompt_id(output_csv_path)
+    # Define the output directory and file path
+    output_dir = dir / 'output'
+    output_csv_path = output_dir / 'single_prompt_response.csv'
+    
+    # Ensure the directory exists
+    if not output_dir.exists():
+        os.makedirs(output_dir)
     
     # Create DataFrame for the new prompt
-    new_df = pd.DataFrame([{"Prompt ID": prompt_id, "Prompt": prompt, **responses}])
+    new_df = pd.DataFrame([{"Prompt ID": get_next_prompt_id(output_csv_path), "Prompt": prompt, **responses}])
 
     # Save the DataFrame to CSV
     if output_csv_path.exists():
@@ -97,6 +102,7 @@ def save_single_prompt(prompt: str, responses: dict):
         file_name='single_prompt_response.csv',
         mime='text/csv'
     )
+
 
 def process_csv(file):
     try:
