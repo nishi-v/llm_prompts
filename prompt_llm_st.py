@@ -19,6 +19,8 @@ COHERE_API_KEY = os.environ['COHERE_API_KEY']
 GEMINI_API_KEY = os.environ['GEMINI_API_KEY']
 GROQ_API_KEY = os.environ['GROQ_API_KEY']
 OPENAI_API_KEY = os.environ['OPENAI_API_KEY']
+os.environ['LITELLM_LOG'] = 'DEBUG'
+
 
 def extract_streaming_content(response):
     content = ""
@@ -29,12 +31,12 @@ def extract_streaming_content(response):
                     delta = chunk['choices'][0].get('delta', {})
                     if 'content' in delta:
                         content += delta['content']
-                        print(delta['content']) 
+                        print(delta['content'])  # Display on Streamlit UI
             elif hasattr(chunk, 'choices') and chunk.choices:
                 delta = chunk.choices[0].delta
                 if hasattr(delta, 'content') and delta.content:
                     content += delta.content
-                    print(delta.content)
+                    print(delta.content)  # Display on Streamlit UI
     except Exception as e:
         st.error(f"Error extracting content: {e}")
     return content.strip()
@@ -68,17 +70,32 @@ def get_next_prompt_id(csv_path: Path) -> str:
             return f"prompt{next_id_num}"
     return "prompt1"
 
-def save_single_prompt(prompt, responses):
+def save_single_prompt(prompt: str, responses: dict):
     output_csv_path = dir / 'output/single_prompt_response.csv'
     prompt_id = get_next_prompt_id(output_csv_path)
-    new_df = pd.DataFrame([{"Prompt ID": prompt_id, "Prompt": prompt, **responses}])
     
+    # Create DataFrame for the new prompt
+    new_df = pd.DataFrame([{"Prompt ID": prompt_id, "Prompt": prompt, **responses}])
+
+    # Save the DataFrame to CSV
     if output_csv_path.exists():
         new_df.to_csv(output_csv_path, mode='a', header=False, index=False)
     else:
         new_df.to_csv(output_csv_path, index=False)
-    
-    st.success(f"Data saved to {output_csv_path}")
+
+    # Load and display the content of the CSV
+    df = pd.read_csv(output_csv_path)
+    st.subheader("CSV Content")
+    st.dataframe(df)  # Display the DataFrame in the app
+
+    # Provide download option for the CSV
+    csv_data = df.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="Download CSV",
+        data=csv_data,
+        file_name='single_prompt_response.csv',
+        mime='text/csv'
+    )
 
 def process_csv(file):
     try:
@@ -89,15 +106,37 @@ def process_csv(file):
         if 'Prompt ID' not in df.columns:
             df['Prompt ID'] = [f"prompt{i+1}" for i in range(len(df))]
 
+        st.subheader("Prompt Processing Results")
+        # Process each prompt
         for index, row in df.iterrows():
             prompt = row['Prompt']
+            # st.write(f"Processing prompt {index + 1}: {prompt}")
             responses = process_prompt(prompt)
+            
+            # Write responses to the app
+            st.write("Responses:", responses)
+            
+            # Update the DataFrame with the responses
             for key, value in responses.items():
                 df.at[index, key] = value
 
+        # Save processed responses to a CSV
         output_csv_path = dir / 'output/processed_prompts.csv'
         df.to_csv(output_csv_path, index=False)
-        st.success(f"Data saved to {output_csv_path}")
+
+        # Display the CSV content in the app
+        st.subheader("Processed CSV Content")
+        st.dataframe(df)  # Display the processed DataFrame in the app
+
+        # Provide download option for the processed CSV
+        csv_data = df.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="Download Processed CSV",
+            data=csv_data,
+            file_name='processed_prompts.csv',
+            mime='text/csv'
+        )
+
     except Exception as e:
         st.error(f"Error processing CSV file: {e}")
 
