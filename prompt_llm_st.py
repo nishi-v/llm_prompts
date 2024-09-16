@@ -15,10 +15,14 @@ st.title("LLM Prompting")
 dir = Path(os.getcwd())
 load_dotenv(dir / '.env')
 
-COHERE_API_KEY = os.environ['COHERE_API_KEY']
-GEMINI_API_KEY = os.environ['GEMINI_API_KEY']
-GROQ_API_KEY = os.environ['GROQ_API_KEY']
-OPENAI_API_KEY = os.environ['OPENAI_API_KEY']
+# Access API keys from Streamlit secrets
+COHERE_API_KEY = st.secrets["api_keys"]["COHERE_API_KEY"]
+GEMINI_API_KEY = st.secrets["api_keys"]["GEMINI_API_KEY"]
+GROQ_API_KEY = st.secrets["api_keys"]["GROQ_API_KEY"]
+OPENAI_API_KEY = st.secrets["api_keys"]["OPENAI_API_KEY"]
+PERPLEXITYAI_API_KEY = st.secrets["api_keys"]["PERPLEXITYAI_API_KEY"]
+
+# Ensure LITELLM_LOG is set for logging
 os.environ['LITELLM_LOG'] = 'DEBUG'
 
 

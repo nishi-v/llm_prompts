@@ -664,7 +664,6 @@ FodyWeavers.xsd
 /.venv
 /.vscode
 .env
-
 notebooks/
 py_scripts/
 csv_prompt.py
