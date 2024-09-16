@@ -669,3 +669,5 @@ py_scripts/
 csv_prompt.py
 output/
 llm_prompt.py
+secrets.toml
+.streamlit/
