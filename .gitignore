@@ -668,3 +668,9 @@ FodyWeavers.xsd
 output/.~lock.responses.csv#
 notebooks/
 py_scripts/
+csv_prompt.py
+output/.~lock.responses1.csv#
+output/.~lock.input.csv#
+output/.~lock.single_prompt_response.csv#
+output/responses.csv
+output/responses1.csv
