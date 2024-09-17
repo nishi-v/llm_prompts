@@ -667,11 +667,10 @@ FodyWeavers.xsd
 notebooks/
 py_scripts/
 csv_prompt.py
-output/.~lock.my_imput.csv#
-output/input.csv
-output/my_imput.csv
-output/processed_prompts.csv
-output/responses.csv
-output/responses1.csv
-output/single_prompt_response.csv
+output/
 llm_prompt.py
+output/input.js
+json_to_csv.py
+csv_to_json.py
+single_prompt_response.js
+single_prompt_response.csv
