@@ -4,6 +4,8 @@ Clone the repository:
 
 
 Note:
-- An input prompt will come when you run llm_prompt.py, enter something in it.
+- Select either to input a prompt or to add a csv with multiple prompts.
 
-- The outputs will be saved in output/responses.csv.
+- For input prompt, enter something in it final output will be saved in csv file.
+
+- For csv, select the csv while which has multiple prompts, prompt1, prompt2, etc in it and then click on process csv. Final corresponding outputs for each prompt in csv will be saved in the same csv file.
