@@ -674,3 +674,5 @@ json_to_csv.py
 csv_to_json.py
 single_prompt_response.js
 single_prompt_response.csv
+*.csv
+*.js

@@ -7,6 +7,7 @@ import asyncio
 from dotenv import load_dotenv
 import litellm
 from litellm import completion
+import datetime
 
 # Set verbosity for litellm
 litellm.set_verbose = True
@@ -24,27 +25,39 @@ OPENAI_API_KEY = os.environ['OPENAI_API_KEY']
 
 os.environ['LITELLM_LOG'] = 'DEBUG'
 
+# Initialize session state for conversation history and end flag
+if 'conversation_history' not in st.session_state:
+    st.session_state.conversation_history = []
+if 'conversation_ended' not in st.session_state:
+    st.session_state.conversation_ended = False
+
 def extract_streaming_content(response):
     content = ""
+    buffer = ""
     try:
         for chunk in response:
             if isinstance(chunk, dict) and 'choices' in chunk:
                 delta = chunk['choices'][0].get('delta', {})
                 if 'content' in delta:
-                    content += delta['content']
-                    print(delta['content'])  # Display on Streamlit UI
+                    buffer += delta['content']
             elif hasattr(chunk, 'choices') and chunk.choices:
                 delta = chunk.choices[0].delta
                 if hasattr(delta, 'content') and delta.content:
-                    content += delta.content
-                    print(delta.content)  # Display on Streamlit UI
+                    buffer += delta.content
+            
+            if buffer.endswith((' ', '.', '!', '?', '\n')):
+                content += buffer
+                buffer = ""
     except Exception as e:
         st.error(f"Error extracting content: {e}")
+    
+    if buffer:
+        content += buffer
+    
     return content.strip()
 
-def get_streaming_response_sync(model: str, prompt: str):
+def get_streaming_response_sync(model: str, messages: list):
     try:
-        messages = [{"content": prompt, "role": "user"}]
         response = completion(model=model, messages=messages, stream=True)
         return extract_streaming_content(response)
     except litellm.ServiceUnavailableError as e:
@@ -55,70 +68,55 @@ def get_streaming_response_sync(model: str, prompt: str):
         return "Error"
 
 async def process_prompt(prompt):
-    st.write(f"Processing prompt: {prompt}")
+    messages = [{"content": p['Prompt'], "role": "user"} for p in st.session_state.conversation_history] + [{"content": prompt, "role": "user"}]
     responses = {
-        "Cohere Response": get_streaming_response_sync("command-nightly", prompt),
-        "Gemini Response": get_streaming_response_sync("gemini/gemini-pro", prompt),
-        "OpenAI Response": get_streaming_response_sync("gpt-4", prompt),
-        "Llama Response": get_streaming_response_sync("groq/llama-3.1-70b-versatile", prompt),
-        "Mixtral Response": get_streaming_response_sync("groq/mixtral-8x7b-32768", prompt)
+        "Cohere Response": get_streaming_response_sync("command-nightly", messages),
+        "Gemini Response": get_streaming_response_sync("gemini/gemini-pro", messages),
+        "OpenAI Response": get_streaming_response_sync("gpt-4", messages),
+        "Llama Response": get_streaming_response_sync("groq/llama-3.1-70b-versatile", messages),
+        "Mixtral Response": get_streaming_response_sync("groq/mixtral-8x7b-32768", messages)
     }
     return responses
 
-def get_next_prompt_id(csv_path: Path) -> str:
-    if csv_path.exists():
-        df = pd.read_csv(csv_path)
-        if 'Prompt ID' in df.columns:
-            last_id = df['Prompt ID'].iloc[-1]
-            next_id_num = int(last_id.replace('prompt', '')) + 1
-            return f"prompt{next_id_num}"
-    return "prompt1"
+def display_responses(responses):
+    st.write("Responses:")
+    st.json(responses)
 
-def save_single_prompt(prompt: str, responses: dict):
-    output_csv_path = dir / 'single_prompt_response.csv'
-    output_js_path = dir / 'single_prompt_response.js'
+def save_conversation(conversation_history, timestamp):
+    output_csv_path = dir / f'conversation_output_{timestamp}.csv'
+    output_js_path = dir / f'conversation_output_{timestamp}.js'
     
-    if not dir.exists():
-        os.makedirs(dir)
+    # Prepare DataFrame for CSV and JS
+    df = pd.DataFrame(conversation_history)
     
-    new_df = pd.DataFrame([{"Prompt ID": get_next_prompt_id(output_csv_path), "Prompt": prompt, **responses}])
-
-    if output_csv_path.exists():
-        new_df.to_csv(output_csv_path, mode='a', header=False, index=False)
-    else:
-        new_df.to_csv(output_csv_path, index=False)
-
-    df = pd.read_csv(output_csv_path)
-    st.subheader("CSV Content")
+    # Save as CSV
+    df.to_csv(output_csv_path, index=False)
+    st.subheader("Conversation CSV Content")
     st.dataframe(df)
-
+    
     csv_data = df.to_csv(index=False).encode('utf-8')
     st.download_button(
-        label="Download CSV",
+        label="Download Conversation CSV",
         data=csv_data,
-        file_name='single_prompt_response.csv',
+        file_name=f'conversation_output_{timestamp}.csv',
         mime='text/csv'
     )
-
+    
     # Save as JS
     js_data = df.to_dict(orient='records')
     with open(output_js_path, 'w') as f:
         json.dump(js_data, f, indent=4)
     
-    # Check if JS file was created
-    if output_js_path.exists():
-        st.subheader("JS Content")
-        with open(output_js_path, 'r') as f:
-            js_content = f.read()
-        st.text_area("JS Content", value=js_content, height=400, max_chars=None)  # Adjust height as needed
-
-        js_data_encoded = json.dumps(js_data, indent=4).encode('utf-8')
-        st.download_button(
-            label="Download JS",
-            data=js_data_encoded,
-            file_name='single_prompt_response.js',
-            mime='application/javascript'
-        )
+    st.subheader("Conversation JS Content")
+    st.text_area("JS Content", value=json.dumps(js_data, indent=4), height=400, max_chars=None)
+    
+    js_data_encoded = json.dumps(js_data, indent=4).encode('utf-8')
+    st.download_button(
+        label="Download Conversation JS",
+        data=js_data_encoded,
+        file_name=f'conversation_output_{timestamp}.js',
+        mime='application/javascript'
+    )
 
 async def process_csv(file):
     try:
@@ -132,6 +130,7 @@ async def process_csv(file):
         st.subheader("Prompt Processing Results")
         for index, row in df.iterrows():
             prompt = row['Prompt']
+            st.write("Processing Prompt: ", prompt)
             responses = await process_prompt(prompt)
             
             st.write("Responses:", responses)
@@ -191,6 +190,7 @@ async def process_js_file(file):
         st.subheader("Prompt Processing Results")
         for index, row in df.iterrows():
             prompt = row['Prompt']
+            st.write("Processing Prompt: ", prompt)
             responses = await process_prompt(prompt)
             
             st.write("Responses:", responses)
@@ -235,18 +235,24 @@ async def process_js_file(file):
         st.error(f"Error processing JS file: {e}")
 
 async def main():
-    st.sidebar.title("Choose Input Method")
-    input_method = st.sidebar.radio("Input Method", ('Single Prompt', 'Upload CSV', 'Upload JS'))
-
-    if input_method == 'Single Prompt':
+    st.sidebar.title("Input Method")
+    input_method = st.sidebar.radio("Choose an input method:", ['Prompt', 'Upload CSV', 'Upload JS'])
+    
+    if input_method == 'Prompt':
         prompt = st.text_area("Enter your prompt:")
-        if st.button("Submit"):
-            if prompt:
-                responses = await process_prompt(prompt)
-                st.write("Responses:", responses)
-                save_single_prompt(prompt, responses)
-            else:
-                st.error("Please enter a prompt.")
+        if st.button("Submit Prompt"):
+            st.write("Processing prompt: ", prompt)
+            responses = await process_prompt(prompt)
+            display_responses(responses)
+            st.session_state.conversation_history.append({"Prompt": prompt, **responses})
+        
+        if st.button("End Conversation"):
+            if st.session_state.conversation_history:
+                timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+                save_conversation(st.session_state.conversation_history, timestamp)
+            st.session_state.conversation_ended = True
+            st.session_state.conversation_history = []
+            st.success("Conversation ended and history cleared.")
 
     elif input_method == 'Upload CSV':
         uploaded_file = st.file_uploader("Upload CSV file", type=["csv"])
